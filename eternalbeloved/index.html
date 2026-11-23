@@ -31,6 +31,9 @@
   #c.drag { cursor: grabbing; }
 
   .hud { position: fixed; z-index: 3; }
+  .loading { inset: 0; margin: 0; display: grid; place-items: center; text-align: center; padding: 0 24px; font: 400 11px/1.7 var(--f-mono); letter-spacing: .18em; text-transform: uppercase; color: var(--dust); pointer-events: none; transition: opacity .8s; }
+  .loading.done { opacity: 0; }
+  .loading.fail { color: var(--bone); background: var(--void); text-transform: none; letter-spacing: .04em; font-size: 13px; pointer-events: auto; }
   .mono { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dust); }
   .brand { top: calc(22px + env(safe-area-inset-top, 0px)); left: max(22px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
   .brand .wide { font-family: var(--f-wide); font-stretch: 125%; font-weight: 300; font-size: 13px; letter-spacing: 0.42em; text-transform: uppercase; }
@@ -75,6 +78,7 @@
 </style>
 </head>
 <body>
+<p class="hud loading" id="loading">carregando a peça…</p>
 <canvas id="c" tabindex="0" aria-label="Peça 3D: coração atravessado por uma flecha, sobre uma bancada de concreto. Arraste para girar, role ou faça pinça para aproximar."></canvas>
 
 <header class="hud brand">
@@ -101,6 +105,21 @@
   </div>
 </div>
 
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
+<script>
+  // se o 3D não abrir (navegador antigo, WebGL desligado, rede bloqueada), mostra uma mensagem em vez de tela preta
+  (function () {
+    function fail(msg) {
+      if (window.__ebReady) return;
+      var el = document.getElementById("loading"); if (!el) return;
+      el.className = "hud loading fail"; el.innerHTML = msg || "Este navegador não conseguiu abrir a peça em 3D.<br>Tente atualizar o navegador ou abrir no Chrome, Safari ou Edge atualizados.";
+    }
+    window.__ebFail = fail;
+    window.addEventListener("error", function (e) { if (!window.__ebReady && e && (e.filename || "").indexOf("three") >= 0) fail(); });
+    window.addEventListener("unhandledrejection", function () { if (!window.__ebReady) fail(); });
+    setTimeout(function () { if (!window.__ebReady) fail("A peça está demorando para carregar.<br>Se continuar assim, atualize a página ou tente outro navegador."); }, 20000);
+  })();
+</script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -122,12 +141,15 @@ const NAME = rawName && rawName.length <= 32 ? rawName.replace(/(^|\s)\p{L}/gu, 
 if (NAME) document.getElementById('label-d').innerHTML = `Chaveiro. Coração atravessado por flecha, 2026.<br>Relicário: abre ao meio e guarda uma foto.<br>Para impressão 3D, 63 × 40 mm. Para ${NAME.replace(/[<>&]/g, '')}.`;
 
 const canvas = document.getElementById('c');
+const MOBILE = Math.min(innerWidth, innerHeight) < 700 || /Mobi|Android|iPhone|iPad/.test(navigator.userAgent);
 const rnd = (a, b) => a + Math.random() * (b - a);
 const lerp = THREE.MathUtils.lerp, clamp = THREE.MathUtils.clamp;
 
 /* ================= renderer ================= */
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); }
+catch (err) { window.__ebFail?.('Este aparelho não liberou o WebGL (3D) para o navegador.<br>Tente outro navegador ou ative a aceleração de hardware.'); throw err; }
+renderer.setPixelRatio(Math.min(devicePixelRatio, MOBILE ? 1.5 : 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -172,7 +194,7 @@ const plinth = new THREE.Mesh(new THREE.BoxGeometry(2.2, TOP - FLOOR_Y, 2.2), co
 /* ================= luz de galeria ================= */
 scene.add(new THREE.HemisphereLight(0xc9c2ba, 0x0b0909, .2));
 const spot = new THREE.SpotLight(0xf3efe8, 300, 0, .36, .7, 2); spot.position.set(1.2, 9, 3.2); spot.target.position.set(0, -.6, 0);
-spot.castShadow = true; spot.shadow.mapSize.set(2048, 2048); spot.shadow.bias = -.0002; spot.shadow.normalBias = .02; spot.shadow.camera.near = 3; spot.shadow.camera.far = 20;
+spot.castShadow = true; spot.shadow.mapSize.set(MOBILE ? 1024 : 2048, MOBILE ? 1024 : 2048); spot.shadow.bias = -.0002; spot.shadow.normalBias = .02; spot.shadow.camera.near = 3; spot.shadow.camera.far = 20;
 scene.add(spot, spot.target);
 const rim = new THREE.SpotLight(0xff6aa8, 80, 0, .5, .8, 2); rim.position.set(-3, 3.5, -4.5); rim.target.position.set(0, .4, 0); scene.add(rim, rim.target);
 const fill = new THREE.SpotLight(0xd8e0ff, 25, 0, .6, 1, 2); fill.position.set(4, 1, 5); fill.target.position.set(0, .4, 0); scene.add(fill, fill.target);
@@ -189,7 +211,7 @@ const fill = new THREE.SpotLight(0xd8e0ff, 25, 0, .6, 1, 2); fill.position.set(4
 /* ================= a peça: coração + flecha ================= */
 function F(x, y, z) { return x * x + 2.25 * z * z + y * y - 1 - y * Math.cbrt(x * x + 0.1125 * z * z); }
 function heartGeometry() {
-  const g = new THREE.SphereGeometry(1, 256, 192), p = g.attributes.position, n = g.attributes.normal, v = new THREE.Vector3();
+  const g = new THREE.SphereGeometry(1, MOBILE ? 160 : 256, MOBILE ? 120 : 192), p = g.attributes.position, n = g.attributes.normal, v = new THREE.Vector3();
   for (let i = 0; i < p.count; i++) {
     v.fromBufferAttribute(p, i).normalize();
     let lo = 0, hi = 0;
@@ -220,7 +242,9 @@ const PIECE_Y = .5; piece.position.y = PIECE_Y;
 renderer.localClippingEnabled = true;
 const heartGeo = heartGeometry();
 const U = 1 / 16;                                   // 1 unidade = 16 mm (mesma escala do STL)
-const HINGE = new THREE.Vector3(0, 19.5 * U, 0);    // furo da argola = eixo da dobradiça
+const HINGE = new THREE.Vector3(0, 19.5 * U, 0);    // centro do furo da argola
+const RING_R = 12.5 * U, RING_W = .6 * U;           // argola de chaveiro de 25 mm, arame de 1,2 mm
+const RING_C = new THREE.Vector3(0, HINGE.y + RING_R, 0); // o arame passa pelo furo: a frente gira em volta deste centro
 
 const ARROW_L = 3.9; // mesmas medidas do STL
 const ADIR = new THREE.Vector3(1, .42, .32).normalize();
@@ -290,9 +314,9 @@ function syncHalfMats() {
 }
 const holeMat = new THREE.MeshStandardMaterial({ color: '#2a0f1a', roughness: .9, side: THREE.BackSide });
 const pinMat = new THREE.MeshStandardMaterial({ color: '#f4f1ea', roughness: .4 });
-function buildHalf(side) {                          // side: 1 = frente (ponta da flecha), -1 = trás (penas e bolso)
-  const pivot = new THREE.Group(); pivot.position.copy(HINGE); piece.add(pivot);
-  const body = new THREE.Group(); body.position.copy(HINGE).multiplyScalar(-1); pivot.add(body);
+function buildHalf(side, pivotAt = HINGE) {                          // side: 1 = frente (ponta da flecha), -1 = trás (penas e bolso)
+  const pivot = new THREE.Group(); pivot.position.copy(pivotAt); piece.add(pivot);
+  const body = new THREE.Group(); body.position.copy(pivotAt).multiplyScalar(-1); pivot.add(body);
   const local = new THREE.Plane(new THREE.Vector3(0, 0, side), 0), world = new THREE.Plane();
   const mats = halfMats(world);
   const h = new THREE.Mesh(heartGeo, mats.heart); h.castShadow = h.receiveShadow = true; body.add(h);
@@ -316,9 +340,9 @@ function buildHalf(side) {                          // side: 1 = frente (ponta d
   }
   const half = { side, pivot, body, local, world, mats }; halves.push(half); return half;
 }
-const FRONT = buildHalf(1), BACK = buildHalf(-1);
-const ring = new THREE.Mesh(new THREE.TorusGeometry(.42, .028, 20, 120), new THREE.MeshPhysicalMaterial({ color: '#d4d4da', metalness: 1, roughness: .16, clearcoat: .5, envMapIntensity: 1.6 }));
-ring.rotation.y = Math.PI / 2; ring.position.y = HINGE.y + .42; ring.castShadow = true; piece.add(ring);
+const FRONT = buildHalf(1, RING_C), BACK = buildHalf(-1);
+const ring = new THREE.Mesh(new THREE.TorusGeometry(RING_R, RING_W, 20, 160), new THREE.MeshPhysicalMaterial({ color: '#d4d4da', metalness: 1, roughness: .16, clearcoat: .5, envMapIntensity: 1.6 }));
+ring.rotation.y = Math.PI / 2; ring.position.copy(RING_C); ring.castShadow = true; piece.add(ring);
 
 function applyFinish(name) {
   const f = FINISH[name];
@@ -384,7 +408,7 @@ const grain = new ShaderPass({
 composer.addPass(grain);
 
 /* ================= girar a peça, aproximar ================= */
-const TARGET = new THREE.Vector3(0, .55, 0);
+const TARGET = new THREE.Vector3(0, .85, 0);
 const HOME = { yaw: -.5, elev: .1, dist: 8.5 };
 let yaw = HOME.yaw, yawV = 0, elev = HOME.elev, elevT = HOME.elev, dist = HOME.dist, distT = HOME.dist, idle = 0;
 const pointers = new Map(); let pinch0 = 0, lastTap = 0;
@@ -439,12 +463,14 @@ function frame() {
   open += (openT - open) * (1 - Math.exp(-dt * 3.2)); const e = open * open * (3 - 2 * open);
   // como na peça real: a argola passa pelos furos; a frente desliza pela argola até sair dos pinos e gira de lado em volta dela
   const k1 = Math.min(1, e / .35), k2 = Math.max(0, (e - .3) / .7);
-  FRONT.pivot.position.z = 3.5 * U * k1 * k1 * (3 - 2 * k1); FRONT.pivot.rotation.z = 2.0 * k2 * k2 * (3 - 2 * k2);
-  piece.position.y = PIECE_Y + Math.sin(t * .8) * .06; ring.rotation.z = Math.sin(t * 1.1) * .12; // flutua
+  // 1) sai dos pinos deslizando 3,5 mm  2) sobe seguindo o arame da argola (conferido no Blender até 110°, sem colisão)
+  FRONT.pivot.position.z = 3.5 * U * k1 * k1 * (3 - 2 * k1); FRONT.pivot.rotation.x = -1.75 * k2 * k2 * (3 - 2 * k2);
+  piece.position.y = PIECE_Y + Math.sin(t * .8) * .06; // flutua
   camera.position.set(0, TARGET.y + Math.sin(elev) * dist, Math.cos(elev) * dist); camera.lookAt(TARGET);
   grain.uniforms.uTime.value = t;
   piece.updateMatrixWorld(true); for (const h of halves) h.world.copy(h.local).applyMatrix4(h.body.matrixWorld);
   composer.render(dt);
+  if (!window.__ebReady) { window.__ebReady = true; const l = document.getElementById('loading'); l.className = 'hud loading done'; setTimeout(() => l.remove(), 900); }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
