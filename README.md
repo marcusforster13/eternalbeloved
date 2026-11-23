@@ -7,3 +7,5 @@ Chaveiro de coração atravessado por flecha, em 3D, publicado em **mofl.com.br/
 - `ferramentas/gerar_stl.py`: gera o STL a partir da mesma equação do coração usada na página (`python ferramentas/gerar_stl.py`, só biblioteca padrão).
 
 O site principal (projeto `mofl-site` na Vercel) serve esta página em `/eternalbeloved` por uma regra de rewrite para o deploy deste repositório.
+
+No ar: https://mofl.com.br/eternalbeloved/
