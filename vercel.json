@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "trailingSlash": true,
+  "headers": [
+    {
+      "source": "/eternalbeloved/eternal-beloved-stl.zip",
+      "headers": [{ "key": "Content-Disposition", "value": "attachment; filename=\"eternal-beloved-stl.zip\"" }]
+    }
+  ]
+}

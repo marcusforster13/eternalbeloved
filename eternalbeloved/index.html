@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Eternal Beloved: chaveiro de coração atravessado por flecha, em 3D. Gire, aproxime e baixe o STL para imprimir.">
+<meta property="og:title" content="Eternal Beloved">
+<meta property="og:description" content="Coração atravessado por flecha, em 3D. Para girar, aproximar e imprimir.">
+<meta name="theme-color" content="#0b0a0a">
+<title>Eternal Beloved</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Cormorant+Garamond:ital,wght@1,300;1,400&family=IBM+Plex+Mono:wght@300;400&display=swap">
+<style>
+  /* Layout: sala de exposição em tela cheia; etiqueta de museu no canto, acabamentos no outro. */
+  :root {
+    color-scheme: dark;
+    --void: #0b0a0a;
+    --bone: #ebe5dc;
+    --dust: #a39a90;
+    --hair: rgba(235, 229, 220, 0.18);
+    --pink: #ff3f93;
+    --f-wide: "Archivo", "Arial Black", "Helvetica Neue", sans-serif;
+    --f-letter: "Cormorant Garamond", "Iowan Old Style", Georgia, serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--void); color: var(--bone); }
+  body { font-family: var(--f-mono); -webkit-font-smoothing: antialiased; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; cursor: grab; }
+  #c.drag { cursor: grabbing; }
+
+  .hud { position: fixed; z-index: 3; }
+  .mono { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dust); }
+  .brand { top: calc(22px + env(safe-area-inset-top, 0px)); left: max(22px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+  .brand .wide { font-family: var(--f-wide); font-stretch: 125%; font-weight: 300; font-size: 13px; letter-spacing: 0.42em; text-transform: uppercase; }
+
+  .label {
+    left: max(22px, env(safe-area-inset-left, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    max-width: 280px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+    background: rgba(235, 229, 220, 0.06); border-left: 1px solid var(--hair);
+  }
+  .label .t { font-family: var(--f-letter); font-style: italic; font-size: 22px; line-height: 1.1; color: var(--bone); }
+  .label .d { font-size: 11px; line-height: 1.5; letter-spacing: 0.04em; text-transform: none; color: var(--dust); }
+
+  .finish {
+    right: max(22px, env(safe-area-inset-right, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  }
+  .seg { display: flex; border: 1px solid var(--hair); }
+  .seg button {
+    cursor: pointer; background: rgba(11,10,10,.4); color: var(--dust); border: 0; border-radius: 0;
+    font: 400 10px/1 var(--f-mono); letter-spacing: 0.16em; text-transform: uppercase; padding: 10px 12px;
+    transition: color .3s, background .3s;
+  }
+  .seg button + button { border-left: 1px solid var(--hair); }
+  .seg button[aria-pressed="true"] { color: var(--void); background: var(--bone); }
+  .seg button:hover:not([aria-pressed="true"]), .seg button:focus-visible { color: var(--bone); outline: none; }
+
+  .dl { cursor: pointer; background: var(--bone); color: var(--void); border: 0; border-radius: 0; font: 500 10px/1 var(--f-mono); letter-spacing: 0.18em; text-transform: uppercase; padding: 12px 14px; transition: background .3s, color .3s; }
+  .dl:hover, .dl:focus-visible { background: var(--pink); color: var(--bone); outline: none; }
+  .dl:disabled { opacity: .5; cursor: default; }
+  .hint { top: calc(22px + env(safe-area-inset-top, 0px)); right: max(22px, env(safe-area-inset-right, 0px)); text-align: right; pointer-events: none; transition: opacity 1.5s; }
+
+  @media (max-width: 560px) {
+    .label { max-width: none; right: max(22px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+    .finish { left: max(22px, env(safe-area-inset-left, 0px)); align-items: stretch; }
+    .seg button { flex: 1; }
+    .hint { display: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="c" tabindex="0" aria-label="Peça 3D: coração atravessado por uma flecha, sobre uma bancada de concreto. Arraste para girar, role ou faça pinça para aproximar."></canvas>
+
+<header class="hud brand">
+  <span class="wide">Eternal Beloved</span>
+  <span class="mono">chaveiro em exposição</span>
+</header>
+<p class="hud hint mono" id="hint">arraste para girar · role para aproximar<br>duplo toque volta ao início</p>
+
+<div class="hud label">
+  <span class="t">Eternal Beloved</span>
+  <span class="d" id="label-d">Chaveiro. Coração atravessado por flecha, 2026.<br>Peça para impressão 3D, 63 × 40 mm.</span>
+</div>
+
+<div class="hud finish">
+  <button class="dl" id="dl" type="button" hidden>Baixar STL para imprimir (.zip)</button>
+  <span class="mono" id="dl-msg" aria-live="polite"></span>
+  <span class="mono">acabamento</span>
+  <div class="seg" role="group" aria-label="Acabamento da peça">
+    <button type="button" data-f="rosa" aria-pressed="true">Rosa</button>
+    <button type="button" data-f="pla" aria-pressed="false">PLA branco</button>
+    <button type="button" data-f="cromo" aria-pressed="false">Cromo</button>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const rawName = (() => { try { return decodeURIComponent(location.hash.slice(1)).replace(/[-_+]+/g, ' ').trim(); } catch { return ''; } })();
+const NAME = rawName && rawName.length <= 32 ? rawName.replace(/(^|\s)\p{L}/gu, c => c.toUpperCase()) : '';
+if (NAME) document.getElementById('label-d').innerHTML = `Chaveiro. Coração atravessado por flecha, 2026.<br>Peça para impressão 3D, 63 × 40 mm. Para ${NAME.replace(/[<>&]/g, '')}.`;
+
+const canvas = document.getElementById('c');
+const rnd = (a, b) => a + Math.random() * (b - a);
+const lerp = THREE.MathUtils.lerp, clamp = THREE.MathUtils.clamp;
+
+/* ================= renderer ================= */
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const VOID = new THREE.Color('#0b0a0a');
+const scene = new THREE.Scene(); scene.background = VOID.clone(); scene.fog = new THREE.FogExp2(VOID, .05);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, .1, 100);
+
+/* ================= concreto ================= */
+let seed = 1337; const srand = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const perm = new Uint8Array(512); { const p = [...Array(256).keys()]; for (let i = 255; i > 0; i--) { const j = Math.floor(srand() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } for (let i = 0; i < 512; i++) perm[i] = p[i & 255]; }
+const h3 = (x, y, z) => perm[(perm[(perm[x & 255] + y) & 255] + z) & 255] / 255;
+function vnoise(x, y, z) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), xf = x - xi, yf = y - yi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), w = zf * zf * (3 - 2 * zf), L = (a, b, t) => a + (b - a) * t;
+  const x0 = L(L(h3(xi, yi, zi), h3(xi + 1, yi, zi), u), L(h3(xi, yi + 1, zi), h3(xi + 1, yi + 1, zi), u), v);
+  const x1 = L(L(h3(xi, yi, zi + 1), h3(xi + 1, yi, zi + 1), u), L(h3(xi, yi + 1, zi + 1), h3(xi + 1, yi + 1, zi + 1), u), v);
+  return L(x0, x1, w) * 2 - 1;
+}
+function concreteTex(formwork, base) {
+  const s = 512, c = document.createElement('canvas'); c.width = c.height = s; const g = c.getContext('2d');
+  const id = g.createImageData(s, s), d = id.data;
+  for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) { const n = vnoise(x / 46, y / 46, 1.3) * 14 + vnoise(x / 11, y / 11, 7.1) * 7 + (Math.random() - .5) * 20, v = base + n, i = (y * s + x) * 4; d[i] = v + 2; d[i + 1] = v; d[i + 2] = v - 3; d[i + 3] = 255; }
+  g.putImageData(id, 0, 0);
+  for (let k = 0; k < 1400; k++) { g.fillStyle = `rgba(20,18,16,${rnd(.15, .45)})`; g.beginPath(); g.arc(rnd(0, s), rnd(0, s), rnd(.4, 2.2), 0, 7); g.fill(); }
+  if (formwork) {
+    g.strokeStyle = 'rgba(15,13,12,.35)'; g.lineWidth = 2;
+    [0, s / 2].forEach(p => { g.beginPath(); g.moveTo(p + 1, 0); g.lineTo(p + 1, s); g.stroke(); g.beginPath(); g.moveTo(0, p + 1); g.lineTo(s, p + 1); g.stroke(); });
+    [[s / 4, s / 4], [s * 3 / 4, s / 4], [s / 4, s * 3 / 4], [s * 3 / 4, s * 3 / 4]].forEach(([x, y]) => { const gr = g.createRadialGradient(x, y, 0, x, y, 11); gr.addColorStop(0, 'rgba(8,7,6,.9)'); gr.addColorStop(1, 'rgba(25,22,20,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, 11, 0, 7); g.fill(); });
+  }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t;
+}
+const texWall = concreteTex(true, 112), texFloor = concreteTex(false, 96);
+const concrete = (tex, rx, ry) => { const m = tex.clone(); m.repeat.set(rx, ry); m.needsUpdate = true; return new THREE.MeshStandardMaterial({ map: m, bumpMap: m, bumpScale: .6, roughness: .92, envMapIntensity: .12 }); };
+
+const FLOOR_Y = -3, TOP = -1.2;
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), concrete(texFloor, 12, 12)); floor.rotation.x = -Math.PI / 2; floor.position.y = FLOOR_Y; floor.receiveShadow = true; scene.add(floor);
+const wall = new THREE.Mesh(new THREE.BoxGeometry(30, 14, 1), concrete(texWall, 10, 4.6)); wall.position.set(0, 4, -8); wall.receiveShadow = true; scene.add(wall);
+const plinth = new THREE.Mesh(new THREE.BoxGeometry(2.2, TOP - FLOOR_Y, 2.2), concrete(texWall, 1, 1)); plinth.position.y = (TOP + FLOOR_Y) / 2; plinth.castShadow = plinth.receiveShadow = true; scene.add(plinth);
+
+/* ================= luz de galeria ================= */
+scene.add(new THREE.HemisphereLight(0xc9c2ba, 0x0b0909, .2));
+const spot = new THREE.SpotLight(0xf3efe8, 300, 0, .36, .7, 2); spot.position.set(1.2, 9, 3.2); spot.target.position.set(0, -.6, 0);
+spot.castShadow = true; spot.shadow.mapSize.set(2048, 2048); spot.shadow.bias = -.0002; spot.shadow.normalBias = .02; spot.shadow.camera.near = 3; spot.shadow.camera.far = 20;
+scene.add(spot, spot.target);
+const rim = new THREE.SpotLight(0xff6aa8, 80, 0, .5, .8, 2); rim.position.set(-3, 3.5, -4.5); rim.target.position.set(0, .4, 0); scene.add(rim, rim.target);
+const fill = new THREE.SpotLight(0xd8e0ff, 25, 0, .6, 1, 2); fill.position.set(4, 1, 5); fill.target.position.set(0, .4, 0); scene.add(fill, fill.target);
+{
+  const from = spot.position, to = new THREE.Vector3(0, FLOOR_Y, 0), dir = from.clone().sub(to), h = dir.length();
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(Math.tan(.36) * h * 1.05, h, 64, 1, true), new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: `varying vec3 vN; varying vec3 vV; varying float vH; void main(){ vH = uv.y; vec4 mv = modelViewMatrix*vec4(position,1.); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }`,
+    fragmentShader: `varying vec3 vN; varying vec3 vV; varying float vH; void main(){ float e = pow(abs(dot(normalize(vN), normalize(vV))), 2.5); float a = e*.055*smoothstep(0.,.25,vH)*(.35+.65*vH); gl_FragColor = vec4(vec3(1.,.97,.93)*a, a); }`,
+  }));
+  cone.position.copy(to).add(from).multiplyScalar(.5); cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize()); scene.add(cone);
+}
+
+/* ================= a peça: coração + flecha ================= */
+function F(x, y, z) { return x * x + 2.25 * z * z + y * y - 1 - y * Math.cbrt(x * x + 0.1125 * z * z); }
+function heartGeometry() {
+  const g = new THREE.SphereGeometry(1, 256, 192), p = g.attributes.position, n = g.attributes.normal, v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i).normalize();
+    let lo = 0, hi = 0;
+    for (let r = .02; r < 2.5; r += .02) if (F(v.x * r, v.y * r, v.z * r) > 0) { hi = r; lo = r - .02; break; }
+    if (!hi) lo = hi = 1;
+    for (let k = 0; k < 26; k++) { const m = (lo + hi) / 2; if (F(v.x * m, v.y * m, v.z * m) > 0) hi = m; else lo = m; }
+    const r = (lo + hi) / 2, x = v.x * r, y = v.y * r, z = v.z * r;
+    p.setXYZ(i, x, y - .06, z);
+    const e = 1e-4; let gx = F(x + e, y, z) - F(x - e, y, z), gy = F(x, y + e, z) - F(x, y - e, z), gz = F(x, y, z + e) - F(x, y, z - e);
+    let L = Math.hypot(gx, gy, gz); if (!(L > 1e-12)) { gx = v.x; gy = v.y; gz = v.z; L = 1; }
+    n.setXYZ(i, gx / L, gy / L, gz / L);
+  }
+  return g;
+}
+const MAT = {
+  heart: new THREE.MeshPhysicalMaterial({ color: '#ff4f9a', roughness: .26, clearcoat: 1, clearcoatRoughness: .04, sheen: .45, sheenRoughness: .4, sheenColor: new THREE.Color('#ff7fb6'), iridescence: .25, iridescenceIOR: 1.3, emissive: '#e0105f', emissiveIntensity: .05, envMapIntensity: .55 }),
+  shaft: new THREE.MeshPhysicalMaterial({ color: '#121112', metalness: .85, roughness: .32, envMapIntensity: 1.1 }),
+  head: new THREE.MeshPhysicalMaterial({ color: '#c9c9d0', metalness: 1, roughness: .14, envMapIntensity: 1.5, clearcoat: .4 }),
+  fletch: new THREE.MeshPhysicalMaterial({ color: '#1f5bff', roughness: .5, sheen: 1, sheenColor: new THREE.Color('#9fc0ff'), side: THREE.DoubleSide }),
+};
+const FINISH = {
+  rosa: { heart: { color: '#ff4f9a', roughness: .26, metalness: 0, clearcoat: 1, sheen: .45, iridescence: .25, emissiveIntensity: .05, envMapIntensity: .55 }, shaft: { color: '#121112', metalness: .85, roughness: .32 }, head: { color: '#c9c9d0', metalness: 1, roughness: .14 }, fletch: { color: '#1f5bff', metalness: 0, roughness: .5, sheen: 1 }, rim: 80 },
+  pla: { heart: { color: '#efebe4', roughness: .62, metalness: 0, clearcoat: .05, sheen: 0, iridescence: 0, emissiveIntensity: 0, envMapIntensity: .4 }, shaft: { color: '#e9e5de', metalness: 0, roughness: .65 }, head: { color: '#e9e5de', metalness: 0, roughness: .6 }, fletch: { color: '#efebe4', metalness: 0, roughness: .65, sheen: 0 }, rim: 35 },
+  cromo: { heart: { color: '#d9d9e0', roughness: .08, metalness: 1, clearcoat: .6, sheen: 0, iridescence: 0, emissiveIntensity: 0, envMapIntensity: 1.6 }, shaft: { color: '#cfcfd6', metalness: 1, roughness: .12 }, head: { color: '#e4e4ea', metalness: 1, roughness: .06 }, fletch: { color: '#cfcfd6', metalness: 1, roughness: .1, sheen: 0 }, rim: 60 },
+};
+const piece = new THREE.Group(); scene.add(piece);
+const PIECE_Y = .5; piece.position.y = PIECE_Y;
+const heart = new THREE.Mesh(heartGeometry(), MAT.heart); heart.castShadow = true; heart.receiveShadow = true; piece.add(heart);
+
+const ARROW_L = 3.9; // mesmas medidas do STL (1 un. = 16 mm)
+function makeArrow() {
+  const g = new THREE.Group();
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.078, .078, ARROW_L, 24), MAT.shaft); shaft.rotation.z = -Math.PI / 2; g.add(shaft);
+  const head = new THREE.Mesh(new THREE.ConeGeometry(.12, .44, 4), MAT.head); head.rotation.z = -Math.PI / 2; head.position.x = ARROW_L / 2 + .2; head.scale.z = .6; g.add(head);
+  const sh = new THREE.Shape(); sh.moveTo(.08, 0); sh.lineTo(0, .22); sh.quadraticCurveTo(.3, .22, .62, 0); sh.lineTo(.08, 0); // pena alta atrás, descendo até a frente
+  const fg = new THREE.ExtrudeGeometry(sh, { depth: .075, bevelEnabled: false }).translate(0, 0, -.0375);
+  for (let k = 0; k < 3; k++) { const f = new THREE.Mesh(fg, MAT.fletch); f.position.x = -ARROW_L / 2; const h = new THREE.Group(); h.add(f); h.rotation.x = k * Math.PI * 2 / 3; g.add(h); }
+  const nock = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, .1, 16), MAT.head); nock.rotation.z = Math.PI / 2; nock.position.x = -ARROW_L / 2; g.add(nock);
+  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  return g;
+}
+const arrow = makeArrow();
+const ADIR = new THREE.Vector3(1, .42, .32).normalize();
+arrow.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), ADIR);
+arrow.position.set(0, 0, 0); // centrada: as penas de um lado, a ponta do outro
+piece.add(arrow);
+
+/* argola do chaveiro (parte da peça impressa) + argola de metal passando por ela */
+const loop = new THREE.Mesh(new THREE.TorusGeometry(.2, .07, 32, 96), MAT.heart); loop.position.y = 1.14; loop.castShadow = true; piece.add(loop);
+const ring = new THREE.Mesh(new THREE.TorusGeometry(.42, .028, 20, 120), new THREE.MeshPhysicalMaterial({ color: '#d4d4da', metalness: 1, roughness: .16, clearcoat: .5, envMapIntensity: 1.6 }));
+ring.rotation.y = Math.PI / 2; ring.position.y = 1.14 + .42 - .02; ring.castShadow = true; piece.add(ring);
+
+function applyFinish(name) {
+  const f = FINISH[name];
+  ['heart', 'shaft', 'head', 'fletch'].forEach(k => Object.entries(f[k]).forEach(([p, v]) => { if (p === 'color') MAT[k].color.set(v); else if (p in MAT[k]) MAT[k][p] = v; }));
+  rim.intensity = f.rim;
+  document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === name)));
+}
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => applyFinish(b.dataset.f)));
+
+/* ================= baixar o STL ================= */
+// no claude.ai: capability "downloads" + zip em base64; no mofl.com.br: o próprio .zip, servido ao lado da página
+const BASE = location.pathname.startsWith('/eternalbeloved') ? '/eternalbeloved/' : '';
+(async () => {
+  const btn = document.getElementById('dl'), msg = document.getElementById('dl-msg');
+  let dl = null;
+  try { dl = window.claude?.use ? await window.claude.use('downloads') : null; } catch { dl = null; }
+  if (!dl && !BASE) return;
+  btn.hidden = false;
+  btn.addEventListener('click', async () => {
+    if (!dl) { const a = document.createElement('a'); a.href = BASE + 'eternal-beloved-stl.zip'; a.download = 'eternal-beloved-stl.zip'; document.body.appendChild(a); a.click(); a.remove(); return; }
+    btn.disabled = true; msg.textContent = '';
+    try {
+      const res = await fetch('eternal-beloved-stl.b64.txt'); if (!res.ok) throw new Error('fetch');
+      const bin = atob((await res.text()).trim()), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      await dl.save({ filename: 'eternal-beloved-stl.zip', data: new Blob([bytes]) });
+      msg.textContent = 'arquivo salvo';
+    } catch (e) {
+      msg.textContent = e?.code === 'declined' ? '' : e?.code === 'rate_limited' ? 'aguarde e tente de novo' : 'não deu para baixar aqui';
+    } finally { btn.disabled = false; }
+  });
+})();
+
+/* ================= pós ================= */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .3, .5, .85); composer.addPass(bloom);
+composer.addPass(new OutputPass());
+const grain = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime; varying vec2 vUv;
+    void main(){ vec4 c = texture2D(tDiffuse, vUv); float d = length(vUv - .5); c.rgb *= mix(1., .3, smoothstep(.3, .95, d));
+      float n = fract(sin(dot(vUv*vec2(1234.5,987.6) + uTime, vec2(12.9898,78.233)))*43758.5453); c.rgb += (n-.5)*.04; gl_FragColor = c; }`,
+});
+composer.addPass(grain);
+
+/* ================= girar a peça, aproximar ================= */
+const TARGET = new THREE.Vector3(0, .55, 0);
+const HOME = { yaw: -.5, elev: .1, dist: 8.5 };
+let yaw = HOME.yaw, yawV = 0, elev = HOME.elev, elevT = HOME.elev, dist = HOME.dist, distT = HOME.dist, idle = 0;
+const pointers = new Map(); let pinch0 = 0, lastTap = 0;
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture?.(e.pointerId); pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.classList.add('drag'); idle = 0; yawV = 0;
+  if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); }
+  const now = performance.now(); if (now - lastTap < 300 && pointers.size === 1) { yawV = 0; distT = HOME.dist; elevT = HOME.elev; yaw = yaw % (Math.PI * 2); homing = true; } lastTap = now;
+  document.getElementById('hint').style.opacity = 0;
+});
+let homing = false;
+canvas.addEventListener('pointermove', e => {
+  const p = pointers.get(e.pointerId); if (!p) return;
+  if (pointers.size === 1) {
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    yaw += dx * .009; yawV = dx * .009 / Math.max(1 / 120, 1 / 60) * .5; elevT = clamp(elevT + dy * .004, -.25, .75); homing = false;
+  } else if (pointers.size === 2) {
+    p.x = e.clientX; p.y = e.clientY; const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinch0) distT = clamp(distT * pinch0 / d, 4.2, 13); pinch0 = d; return;
+  }
+  p.x = e.clientX; p.y = e.clientY; idle = 0;
+});
+const up = e => { pointers.delete(e.pointerId); if (!pointers.size) canvas.classList.remove('drag'); pinch0 = 0; };
+canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+canvas.addEventListener('wheel', e => { e.preventDefault(); distT = clamp(distT * Math.exp(e.deltaY * .0012), 4.2, 13); idle = 0; }, { passive: false });
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') yawV -= 1.5; if (e.key === 'ArrowRight') yawV += 1.5;
+  if (e.key === 'ArrowUp') elevT = clamp(elevT + .1, -.25, .75); if (e.key === 'ArrowDown') elevT = clamp(elevT - .1, -.25, .75);
+  if (e.key === '+' || e.key === '=') distT = clamp(distT * .9, 4.2, 13); if (e.key === '-') distT = clamp(distT * 1.1, 4.2, 13);
+  idle = 0;
+});
+
+function layout() {
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); bloom.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  const extra = camera.aspect < .8 ? 1.7 : 1; HOME.dist = 8.5 * extra; if (!pointers.size) distT = Math.max(distT, HOME.dist * .9);
+}
+addEventListener('resize', layout); layout(); dist = distT = HOME.dist;
+
+/* ================= loop ================= */
+const clock = new THREE.Clock();
+function frame() {
+  const dt = Math.min(clock.getDelta(), 1 / 20), t = clock.elapsedTime;
+  idle += dt;
+  if (!pointers.size) {
+    yaw += yawV * dt; yawV *= Math.exp(-dt * 2.2);
+    if (idle > 3 && !homing) yawV += (.22 - yawV) * (1 - Math.exp(-dt * .6)); // gira sozinha como num pedestal giratório
+    if (homing) { const goal = Math.round((yaw - HOME.yaw) / (Math.PI * 2)) * Math.PI * 2 + HOME.yaw; yaw += (goal - yaw) * (1 - Math.exp(-dt * 3)); if (Math.abs(goal - yaw) < .002) homing = false; }
+  }
+  elev += (elevT - elev) * (1 - Math.exp(-dt * 6)); dist += (distT - dist) * (1 - Math.exp(-dt * 6));
+  piece.rotation.y = yaw;
+  piece.position.y = PIECE_Y + Math.sin(t * .8) * .06; ring.rotation.z = Math.sin(t * 1.1) * .12; // flutua
+  camera.position.set(0, TARGET.y + Math.sin(elev) * dist, Math.cos(elev) * dist); camera.lookAt(TARGET);
+  grain.uniforms.uTime.value = t;
+  composer.render(dt);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
