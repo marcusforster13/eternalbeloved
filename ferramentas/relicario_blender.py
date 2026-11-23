@@ -5,7 +5,7 @@ depois de ajustar STL e OUT abaixo. Cria uma cena "EternalBeloved" e não mexe n
 
 Passos: une coração + flecha + argola num sólido só, corta no plano z = 0 (frente / trás),
 abre o bolso da foto em forma de coração na metade de trás (0,8 mm), fura 3 furos de 1,95 mm
-para pinos de filamento 1,75 mm, reforça a argola com uma placa de 1,6 mm em cada metade e
+para pinos de filamento 1,75 mm (com chanfro de 0,45 mm na boca), reforça a argola com uma placa de 1,6 mm em cada metade e
 grava os dois STL já deitados com a face lisa na mesa.
 """
 import bpy, bmesh, math, os, struct
@@ -69,6 +69,15 @@ boolean(back, prism("bolso", outline, -POCKET_DEPTH, 0.5), 'DIFFERENCE')
 for x, y in PINS:
     boolean(front, cyl("furo", x, y, PIN_R, -0.5, PIN_DEPTH), 'DIFFERENCE')
     boolean(back, cyl("furo", x, y, PIN_R, -PIN_DEPTH, 0.5), 'DIFFERENCE')
+# chanfro de 0,45 mm a 45 graus na boca dos furos: absorve o "pé de elefante" e guia o pino
+def chamfer(x, y, direction, CH=0.45):
+    me = bpy.data.meshes.new("ch"); bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=64, radius1=PIN_R + CH + 0.3, radius2=PIN_R - 0.001, depth=CH + 0.3)
+    bmesh.ops.translate(bm, verts=bm.verts, vec=(0, 0, (CH + 0.3) / 2 - 0.3)); bm.to_mesh(me); bm.free()
+    o = bpy.data.objects.new("ch", me); sc.collection.objects.link(o)
+    o.data.transform(Matrix.Translation((x, y, 0)) @ (Matrix.Identity(4) if direction > 0 else Matrix.Rotation(math.pi, 4, 'X'))); return o
+for x, y in PINS:
+    boolean(front, chamfer(x, y, +1), 'DIFFERENCE'); boolean(back, chamfer(x, y, -1), 'DIFFERENCE')
 for o, z0, z1 in ((front, 0, LOOP['t']), (back, -LOOP['t'], 0)):
     boolean(o, cyl("disco", LOOP['cx'], LOOP['cy'], LOOP['ro'], z0, z1), 'UNION')
     boolean(o, cyl("argola", LOOP['cx'], LOOP['cy'], LOOP['ri'], -6, 6), 'DIFFERENCE')
