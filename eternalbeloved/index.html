@@ -57,6 +57,10 @@
   .seg button[aria-pressed="true"] { color: var(--void); background: var(--bone); }
   .seg button:hover:not([aria-pressed="true"]), .seg button:focus-visible { color: var(--bone); outline: none; }
 
+  .open { cursor: pointer; background: var(--pink); color: #fff; border: 0; border-radius: 0; font: 500 11px/1 var(--f-mono); letter-spacing: 0.2em; text-transform: uppercase; padding: 14px 16px; transition: background .3s, color .3s, letter-spacing .4s; }
+  .open:hover, .open:focus-visible { background: var(--bone); color: var(--void); letter-spacing: .24em; outline: none; }
+  .ghost { cursor: pointer; border: 1px solid var(--hair); color: var(--bone); background: rgba(11,10,10,.4); font: 400 10px/1 var(--f-mono); letter-spacing: 0.16em; text-transform: uppercase; padding: 11px 12px; }
+  .ghost:hover, .ghost:focus-within { border-color: var(--pink); }
   .dl { cursor: pointer; background: var(--bone); color: var(--void); border: 0; border-radius: 0; font: 500 10px/1 var(--f-mono); letter-spacing: 0.18em; text-transform: uppercase; padding: 12px 14px; transition: background .3s, color .3s; }
   .dl:hover, .dl:focus-visible { background: var(--pink); color: var(--bone); outline: none; }
   .dl:disabled { opacity: .5; cursor: default; }
@@ -85,6 +89,8 @@
 </div>
 
 <div class="hud finish">
+  <button class="open" id="open" type="button" aria-pressed="false">Abrir o coração</button>
+  <label class="ghost" id="photo-btn" hidden>Colocar a foto dela<input type="file" id="photo-in" accept="image/*" hidden></label>
   <button class="dl" id="dl" type="button" hidden>Baixar STL do relicário (.zip)</button>
   <span class="mono" id="dl-msg" aria-live="polite"></span>
   <span class="mono">acabamento</span>
@@ -211,37 +217,132 @@ const FINISH = {
 };
 const piece = new THREE.Group(); scene.add(piece);
 const PIECE_Y = .5; piece.position.y = PIECE_Y;
-const heart = new THREE.Mesh(heartGeometry(), MAT.heart); heart.castShadow = true; heart.receiveShadow = true; piece.add(heart);
+renderer.localClippingEnabled = true;
+const heartGeo = heartGeometry();
+const U = 1 / 16;                                   // 1 unidade = 16 mm (mesma escala do STL)
+const HINGE = new THREE.Vector3(0, 19.5 * U, 0);    // furo da argola = eixo da dobradiça
 
-const ARROW_L = 3.9; // mesmas medidas do STL (1 un. = 16 mm)
-function makeArrow() {
+const ARROW_L = 3.9; // mesmas medidas do STL
+const ADIR = new THREE.Vector3(1, .42, .32).normalize();
+// onde o cabo entra e sai do coração, ao longo da direção da flecha
+function exitT(sign) { let lo = 0, hi = 0; for (let t = .02; t < 3; t += .02) { const p = ADIR.clone().multiplyScalar(t * sign); if (F(p.x, p.y + .06, p.z) > 0) { hi = t; lo = t - .02; break; } } for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2, p = ADIR.clone().multiplyScalar(m * sign); if (F(p.x, p.y + .06, p.z) > 0) hi = m; else lo = m; } return (lo + hi) / 2 * sign; }
+const SHAFT_OUT = exitT(1), SHAFT_IN = exitT(-1);
+function makeArrow(M) {
   const g = new THREE.Group();
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.078, .078, ARROW_L, 24), MAT.shaft); shaft.rotation.z = -Math.PI / 2; g.add(shaft);
-  const head = new THREE.Mesh(new THREE.ConeGeometry(.12, .44, 4), MAT.head); head.rotation.z = -Math.PI / 2; head.position.x = ARROW_L / 2 + .2; head.scale.z = .6; g.add(head);
+  // o cabo só aparece fora do coração (dentro, o bolso da foto já o removeu)
+  for (const [a, b] of [[-ARROW_L / 2, SHAFT_IN + .12], [SHAFT_OUT - .12, ARROW_L / 2]]) {
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(.078, .078, b - a, 24), M.shaft); seg.rotation.z = -Math.PI / 2; seg.position.x = (a + b) / 2; g.add(seg);
+  }
+  const head = new THREE.Mesh(new THREE.ConeGeometry(.12, .44, 4), M.head); head.rotation.z = -Math.PI / 2; head.position.x = ARROW_L / 2 + .2; head.scale.z = .6; g.add(head);
   const sh = new THREE.Shape(); sh.moveTo(.08, 0); sh.lineTo(0, .22); sh.quadraticCurveTo(.3, .22, .62, 0); sh.lineTo(.08, 0); // pena alta atrás, descendo até a frente
   const fg = new THREE.ExtrudeGeometry(sh, { depth: .075, bevelEnabled: false }).translate(0, 0, -.0375);
-  for (let k = 0; k < 3; k++) { const f = new THREE.Mesh(fg, MAT.fletch); f.position.x = -ARROW_L / 2; const h = new THREE.Group(); h.add(f); h.rotation.x = k * Math.PI * 2 / 3; g.add(h); }
-  const nock = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, .1, 16), MAT.head); nock.rotation.z = Math.PI / 2; nock.position.x = -ARROW_L / 2; g.add(nock);
+  for (let k = 0; k < 3; k++) { const f = new THREE.Mesh(fg, M.fletch); f.position.x = -ARROW_L / 2; const h = new THREE.Group(); h.add(f); h.rotation.x = k * Math.PI * 2 / 3; g.add(h); }
+  const nock = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, .1, 16), M.head); nock.rotation.z = Math.PI / 2; nock.position.x = -ARROW_L / 2; g.add(nock);
   g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  g.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), ADIR);
   return g;
 }
-const arrow = makeArrow();
-const ADIR = new THREE.Vector3(1, .42, .32).normalize();
-arrow.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), ADIR);
-arrow.position.set(0, 0, 0); // centrada: as penas de um lado, a ponta do outro
-piece.add(arrow);
 
-/* argola do chaveiro (parte da peça impressa) + argola de metal passando por ela */
-const loop = new THREE.Mesh(new THREE.TorusGeometry(.2, .07, 32, 96), MAT.heart); loop.position.y = 1.14; loop.castShadow = true; piece.add(loop);
+/* contornos no plano do corte (z = 0), os mesmos do Blender */
+function rAt(th) { const dx = Math.cos(th), dy = Math.sin(th); let lo = 0, hi = 0; for (let r = .02; r < 2.5; r += .02) if (F(dx * r, dy * r, 0) > 0) { hi = r; lo = r - .02; break; } for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (F(dx * m, dy * m, 0) > 0) hi = m; else lo = m; } return (lo + hi) / 2; }
+const OUTLINE = [], POCKET = [];
+for (let k = 0; k < 160; k++) { const t = k / 160 * Math.PI * 2, r = rAt(t); OUTLINE.push(new THREE.Vector2(r * Math.cos(t), r * Math.sin(t) - .06)); POCKET.push(new THREE.Vector2(r * Math.cos(t) * .58, (r * Math.sin(t) - .06) * .58 + .05)); }
+const pocketBox = new THREE.Box2().setFromPoints(POCKET), pocketC = pocketBox.getCenter(new THREE.Vector2()), pocketW = pocketBox.max.x - pocketBox.min.x;
+const PHOTO = POCKET.map(p => p.clone().sub(pocketC).multiplyScalar((pocketW - .6 * U) / pocketW).add(pocketC));
+const PINS = [[13.6, 10.5], [-13.6, 10.5], [0, -12]].map(([x, y]) => new THREE.Vector2(x * U, y * U));
+const PIN_R = .975 * U, PIN_D = 3 * U, POCKET_D = .8 * U;
+const circle = (c, r) => { const p = new THREE.Path(); p.absarc(c.x, c.y, r, 0, Math.PI * 2, true); return p; };
+
+/* foto: começa com um cartão, e dá para colocar a foto dela */
+const photoCanvas = document.createElement('canvas'); photoCanvas.width = photoCanvas.height = 512;
+const photoTex = new THREE.CanvasTexture(photoCanvas); photoTex.colorSpace = THREE.SRGBColorSpace;
+let hasPhoto = false;
+function drawCard() {
+  if (hasPhoto) return;
+  const g = photoCanvas.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 512);
+  gr.addColorStop(0, '#ffd6e6'); gr.addColorStop(1, '#ff7fb0'); g.fillStyle = gr; g.fillRect(0, 0, 512, 512);
+  g.fillStyle = 'rgba(255,255,255,.92)'; g.textAlign = 'center'; g.font = 'italic 300 70px "Cormorant Garamond", Georgia, serif';
+  g.fillText('Eternal', 256, 245); g.fillText('Beloved', 256, 318);
+  if (NAME) { g.font = 'italic 300 44px "Cormorant Garamond", Georgia, serif'; g.fillText(NAME, 256, 385); }
+  photoTex.needsUpdate = true;
+}
+drawCard(); if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawCard);
+const photoMat = new THREE.MeshBasicMaterial({ map: photoTex, side: THREE.DoubleSide, color: new THREE.Color(.82, .82, .82) }); // cores reais da foto, sem estourar na luz
+function setPhoto(img) {
+  const g = photoCanvas.getContext('2d'), s = Math.min(img.width, img.height), sx = (img.width - s) / 2, sy = Math.max(0, (img.height - s) * .35);
+  g.drawImage(img, sx, sy, s, s, 0, 0, 512, 512); hasPhoto = true; photoTex.needsUpdate = true;
+}
+
+/* as duas metades: corte por plano de recorte, tampa no corte, dobradiça na argola */
+const halves = [];
+function halfMats(plane) {
+  const m = {};
+  for (const k of ['heart', 'shaft', 'head', 'fletch']) { m[k] = MAT[k].clone(); m[k].clippingPlanes = [plane]; m[k].clipShadows = true; }
+  m.cap = MAT.heart.clone(); m.cap.side = THREE.DoubleSide;
+  m.well = MAT.heart.clone(); m.well.side = THREE.BackSide;
+  return m;
+}
+function syncHalfMats() {
+  for (const h of halves) for (const k in h.mats) {
+    const mat = h.mats[k], src = (k === 'cap' || k === 'well') ? MAT.heart : MAT[k], pl = mat.clippingPlanes, side = mat.side;
+    mat.copy(src); mat.clippingPlanes = pl; mat.clipShadows = true; mat.side = side;
+  }
+}
+const holeMat = new THREE.MeshStandardMaterial({ color: '#2a0f1a', roughness: .9, side: THREE.BackSide });
+const pinMat = new THREE.MeshStandardMaterial({ color: '#f4f1ea', roughness: .4 });
+function buildHalf(side) {                          // side: 1 = frente (ponta da flecha), -1 = trás (penas e bolso)
+  const pivot = new THREE.Group(); pivot.position.copy(HINGE); piece.add(pivot);
+  const body = new THREE.Group(); body.position.copy(HINGE).multiplyScalar(-1); pivot.add(body);
+  const local = new THREE.Plane(new THREE.Vector3(0, 0, side), 0), world = new THREE.Plane();
+  const mats = halfMats(world);
+  const h = new THREE.Mesh(heartGeo, mats.heart); h.castShadow = h.receiveShadow = true; body.add(h);
+  body.add(makeArrow(mats));
+  const loopRing = new THREE.Mesh(new THREE.TorusGeometry(.2, .07, 32, 96), mats.heart); loopRing.position.y = 1.14; loopRing.castShadow = true; body.add(loopRing);
+  const plateShape = new THREE.Shape(); plateShape.absarc(0, 0, 5 * U, 0, Math.PI * 2, false); plateShape.holes.push(circle(new THREE.Vector2(0, 0), 2.1 * U));
+  const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(plateShape, { depth: 1.6 * U, bevelEnabled: false, curveSegments: 48 }), mats.heart);
+  plate.position.set(0, HINGE.y, side > 0 ? 0 : -1.6 * U); plate.castShadow = true; body.add(plate);
+  const capShape = new THREE.Shape(OUTLINE);
+  PINS.forEach(p => capShape.holes.push(circle(p, PIN_R)));
+  if (side < 0) capShape.holes.push(new THREE.Path(POCKET.slice().reverse()));
+  const cap = new THREE.Mesh(new THREE.ShapeGeometry(capShape, 48), mats.cap); cap.position.z = side * .0004; cap.receiveShadow = true; body.add(cap);
+  PINS.forEach(p => { const w = new THREE.Mesh(new THREE.CylinderGeometry(PIN_R, PIN_R, PIN_D, 24), holeMat); w.rotation.x = Math.PI / 2; w.position.set(p.x, p.y, side * PIN_D / 2); body.add(w); });
+  if (side < 0) {
+    const well = new THREE.Mesh(new THREE.ExtrudeGeometry(new THREE.Shape(POCKET), { depth: POCKET_D, bevelEnabled: false }), mats.well); well.position.z = -POCKET_D; body.add(well);
+    const pg = new THREE.ShapeGeometry(new THREE.Shape(PHOTO), 48), uv = pg.attributes.uv, pp = pg.attributes.position, bb = new THREE.Box2().setFromPoints(PHOTO);
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (pp.getX(i) - bb.min.x) / (bb.max.x - bb.min.x), (pp.getY(i) - bb.min.y) / (bb.max.y - bb.min.y));
+    const photo = new THREE.Mesh(pg, photoMat); photo.position.z = -POCKET_D + .25 * U; body.add(photo);
+  } else {
+    PINS.forEach(p => { const pin = new THREE.Mesh(new THREE.CylinderGeometry(.875 * U, .875 * U, 5.5 * U, 20), pinMat); pin.rotation.x = Math.PI / 2; pin.position.set(p.x, p.y, 0); pin.castShadow = true; body.add(pin); });
+  }
+  const half = { side, pivot, body, local, world, mats }; halves.push(half); return half;
+}
+const FRONT = buildHalf(1), BACK = buildHalf(-1);
 const ring = new THREE.Mesh(new THREE.TorusGeometry(.42, .028, 20, 120), new THREE.MeshPhysicalMaterial({ color: '#d4d4da', metalness: 1, roughness: .16, clearcoat: .5, envMapIntensity: 1.6 }));
-ring.rotation.y = Math.PI / 2; ring.position.y = 1.14 + .42 - .02; ring.castShadow = true; piece.add(ring);
+ring.rotation.y = Math.PI / 2; ring.position.y = HINGE.y + .42; ring.castShadow = true; piece.add(ring);
 
 function applyFinish(name) {
   const f = FINISH[name];
   ['heart', 'shaft', 'head', 'fletch'].forEach(k => Object.entries(f[k]).forEach(([p, v]) => { if (p === 'color') MAT[k].color.set(v); else if (p in MAT[k]) MAT[k][p] = v; }));
+  syncHalfMats();
   rim.intensity = f.rim;
   document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === name)));
 }
+
+/* abrir / fechar */
+let open = 0, openT = 0;
+const openBtn = document.getElementById('open'), photoBtn = document.getElementById('photo-btn');
+function setOpen(v) {
+  openT = v ? 1 : 0; openBtn.setAttribute('aria-pressed', String(!!v)); openBtn.textContent = v ? 'Fechar o coração' : 'Abrir o coração';
+  photoBtn.hidden = !v; idle = 0;
+  if (v) { homeGoal = 0; homing = true; yawV = 0; distT = Math.min(distT, HOME.dist * .78); elevT = .3; }
+  else { homeGoal = HOME.yaw; }
+}
+openBtn.addEventListener('click', () => setOpen(!openT));
+document.getElementById('photo-in').addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0]; if (!file) return;
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => { setPhoto(img); URL.revokeObjectURL(url); }; img.src = url;
+});
 document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => applyFinish(b.dataset.f)));
 
 /* ================= baixar o STL ================= */
@@ -290,10 +391,10 @@ const pointers = new Map(); let pinch0 = 0, lastTap = 0;
 canvas.addEventListener('pointerdown', e => {
   canvas.setPointerCapture?.(e.pointerId); pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.classList.add('drag'); idle = 0; yawV = 0;
   if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); }
-  const now = performance.now(); if (now - lastTap < 300 && pointers.size === 1) { yawV = 0; distT = HOME.dist; elevT = HOME.elev; yaw = yaw % (Math.PI * 2); homing = true; } lastTap = now;
+  const now = performance.now(); if (now - lastTap < 300 && pointers.size === 1) { yawV = 0; distT = HOME.dist; elevT = openT ? .3 : HOME.elev; yaw = yaw % (Math.PI * 2); homeGoal = openT ? 0 : HOME.yaw; homing = true; } lastTap = now;
   document.getElementById('hint').style.opacity = 0;
 });
-let homing = false;
+let homing = false, homeGoal = HOME.yaw;
 canvas.addEventListener('pointermove', e => {
   const p = pointers.get(e.pointerId); if (!p) return;
   if (pointers.size === 1) {
@@ -309,6 +410,7 @@ const up = e => { pointers.delete(e.pointerId); if (!pointers.size) canvas.class
 canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
 canvas.addEventListener('wheel', e => { e.preventDefault(); distT = clamp(distT * Math.exp(e.deltaY * .0012), 4.2, 13); idle = 0; }, { passive: false });
 addEventListener('keydown', e => {
+  if (e.key === 'o' || e.key === 'O') setOpen(!openT);
   if (e.key === 'ArrowLeft') yawV -= 1.5; if (e.key === 'ArrowRight') yawV += 1.5;
   if (e.key === 'ArrowUp') elevT = clamp(elevT + .1, -.25, .75); if (e.key === 'ArrowDown') elevT = clamp(elevT - .1, -.25, .75);
   if (e.key === '+' || e.key === '=') distT = clamp(distT * .9, 4.2, 13); if (e.key === '-') distT = clamp(distT * 1.1, 4.2, 13);
@@ -329,14 +431,17 @@ function frame() {
   idle += dt;
   if (!pointers.size) {
     yaw += yawV * dt; yawV *= Math.exp(-dt * 2.2);
-    if (idle > 3 && !homing) yawV += (.22 - yawV) * (1 - Math.exp(-dt * .6)); // gira sozinha como num pedestal giratório
-    if (homing) { const goal = Math.round((yaw - HOME.yaw) / (Math.PI * 2)) * Math.PI * 2 + HOME.yaw; yaw += (goal - yaw) * (1 - Math.exp(-dt * 3)); if (Math.abs(goal - yaw) < .002) homing = false; }
+    if (idle > 3 && !homing && !openT) yawV += (.22 - yawV) * (1 - Math.exp(-dt * .6)); // gira sozinha como num pedestal giratório
+    if (homing) { const goal = Math.round((yaw - homeGoal) / (Math.PI * 2)) * Math.PI * 2 + homeGoal; yaw += (goal - yaw) * (1 - Math.exp(-dt * 3)); if (Math.abs(goal - yaw) < .002) homing = false; }
   }
   elev += (elevT - elev) * (1 - Math.exp(-dt * 6)); dist += (distT - dist) * (1 - Math.exp(-dt * 6));
   piece.rotation.y = yaw;
+  open += (openT - open) * (1 - Math.exp(-dt * 3.2)); const e = open * open * (3 - 2 * open);
+  FRONT.pivot.rotation.x = -1.95 * e; BACK.pivot.rotation.x = .22 * e;
   piece.position.y = PIECE_Y + Math.sin(t * .8) * .06; ring.rotation.z = Math.sin(t * 1.1) * .12; // flutua
   camera.position.set(0, TARGET.y + Math.sin(elev) * dist, Math.cos(elev) * dist); camera.lookAt(TARGET);
   grain.uniforms.uTime.value = t;
+  piece.updateMatrixWorld(true); for (const h of halves) h.world.copy(h.local).applyMatrix4(h.body.matrixWorld);
   composer.render(dt);
   requestAnimationFrame(frame);
 }
