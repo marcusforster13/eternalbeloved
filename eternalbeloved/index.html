@@ -81,11 +81,11 @@
 
 <div class="hud label">
   <span class="t">Eternal Beloved</span>
-  <span class="d" id="label-d">Chaveiro. Coração atravessado por flecha, 2026.<br>Peça para impressão 3D, 63 × 40 mm.</span>
+  <span class="d" id="label-d">Chaveiro. Coração atravessado por flecha, 2026.<br>Relicário: abre ao meio e guarda uma foto.<br>Para impressão 3D, 63 × 40 mm.</span>
 </div>
 
 <div class="hud finish">
-  <button class="dl" id="dl" type="button" hidden>Baixar STL para imprimir (.zip)</button>
+  <button class="dl" id="dl" type="button" hidden>Baixar STL do relicário (.zip)</button>
   <span class="mono" id="dl-msg" aria-live="polite"></span>
   <span class="mono">acabamento</span>
   <div class="seg" role="group" aria-label="Acabamento da peça">
@@ -113,7 +113,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const rawName = (() => { try { return decodeURIComponent(location.hash.slice(1)).replace(/[-_+]+/g, ' ').trim(); } catch { return ''; } })();
 const NAME = rawName && rawName.length <= 32 ? rawName.replace(/(^|\s)\p{L}/gu, c => c.toUpperCase()) : '';
-if (NAME) document.getElementById('label-d').innerHTML = `Chaveiro. Coração atravessado por flecha, 2026.<br>Peça para impressão 3D, 63 × 40 mm. Para ${NAME.replace(/[<>&]/g, '')}.`;
+if (NAME) document.getElementById('label-d').innerHTML = `Chaveiro. Coração atravessado por flecha, 2026.<br>Relicário: abre ao meio e guarda uma foto.<br>Para impressão 3D, 63 × 40 mm. Para ${NAME.replace(/[<>&]/g, '')}.`;
 
 const canvas = document.getElementById('c');
 const rnd = (a, b) => a + Math.random() * (b - a);
