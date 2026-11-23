@@ -70,11 +70,24 @@
   .hint { top: calc(22px + env(safe-area-inset-top, 0px)); right: max(22px, env(safe-area-inset-right, 0px)); text-align: right; pointer-events: none; transition: opacity 1.5s; }
 
   @media (max-width: 560px) {
-    .label { max-width: none; right: max(22px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
-    .finish { left: max(22px, env(safe-area-inset-left, 0px)); align-items: stretch; }
-    .seg button { flex: 1; }
+    /* celular: etiqueta pequena logo abaixo do título, botões sozinhos embaixo */
+    .brand { top: calc(16px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); }
+    .label {
+      top: calc(62px + env(safe-area-inset-top, 0px)); bottom: auto;
+      left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+      max-width: none; padding: 8px 10px; gap: 3px; background: none;
+    }
+    .label .t { font-size: 17px; }
+    .label .d { font-size: 10px; line-height: 1.45; }
+    .finish {
+      left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+      bottom: calc(14px + env(safe-area-inset-bottom, 0px)); align-items: stretch; gap: 6px;
+    }
+    .open, .dl, .ghost { padding: 12px 10px; text-align: center; }
+    .seg button { flex: 1; padding: 10px 6px; }
     .hint { display: none; }
   }
+  @media (max-width: 560px) and (max-height: 700px) { .label .d { display: none; } }
 </style>
 </head>
 <body>
@@ -116,8 +129,12 @@
     }
     window.__ebFail = fail;
     window.addEventListener("error", function (e) { if (!window.__ebReady && e && (e.filename || "").indexOf("three") >= 0) fail(); });
-    window.addEventListener("unhandledrejection", function () { if (!window.__ebReady) fail(); });
-    setTimeout(function () { if (!window.__ebReady) fail("A peça está demorando para carregar.<br>Se continuar assim, atualize a página ou tente outro navegador."); }, 20000);
+    // conta só o tempo com a aba visível (aba em segundo plano não desenha e não é erro)
+    var shown = 0; var iv = setInterval(function () {
+      if (window.__ebReady) { clearInterval(iv); return; }
+      if (document.visibilityState === "visible") shown += 1;
+      if (shown >= 25) { clearInterval(iv); fail("A peça está demorando para carregar.<br>Se continuar assim, atualize a página ou tente outro navegador."); }
+    }, 1000);
   })();
 </script>
 <script type="importmap">
@@ -321,9 +338,9 @@ function buildHalf(side, pivotAt = HINGE) {                          // side: 1 
   const mats = halfMats(world);
   const h = new THREE.Mesh(heartGeo, mats.heart); h.castShadow = h.receiveShadow = true; body.add(h);
   body.add(makeArrow(mats));
-  const loopRing = new THREE.Mesh(new THREE.TorusGeometry(.2, .07, 32, 96), mats.heart); loopRing.position.y = 1.14; loopRing.castShadow = true; body.add(loopRing);
+  // (o toro original da argola fica por dentro da placa no STL; aqui só a placa, para não piscar no plano do corte)
   const plateShape = new THREE.Shape(); plateShape.absarc(0, 0, 5 * U, 0, Math.PI * 2, false); plateShape.holes.push(circle(new THREE.Vector2(0, 0), 2.1 * U));
-  const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(plateShape, { depth: 1.6 * U, bevelEnabled: false, curveSegments: 48 }), mats.heart);
+  const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(plateShape, { depth: 1.6 * U, bevelEnabled: false, curveSegments: 48 }), mats.cap);
   plate.position.set(0, HINGE.y, side > 0 ? 0 : -1.6 * U); plate.castShadow = true; body.add(plate);
   const capShape = new THREE.Shape(OUTLINE);
   PINS.forEach(p => capShape.holes.push(circle(p, PIN_R)));
@@ -444,7 +461,8 @@ addEventListener('keydown', e => {
 function layout() {
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); bloom.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
-  const extra = camera.aspect < .8 ? 1.7 : 1; HOME.dist = 8.5 * extra; if (!pointers.size) distT = Math.max(distT, HOME.dist * .9);
+  const extra = camera.aspect < .8 ? 1.75 : 1; HOME.dist = 8.5 * extra;
+  TARGET.y = camera.aspect < .8 ? .55 : .85; // no celular a peça sobe, para não ficar atrás dos botões if (!pointers.size) distT = Math.max(distT, HOME.dist * .9);
 }
 addEventListener('resize', layout); layout(); dist = distT = HOME.dist;
 
