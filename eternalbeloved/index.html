@@ -1,12 +1,4 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Eternal Beloved: chaveiro de coração atravessado por flecha, em 3D. Gire, aproxime e baixe o STL para imprimir.">
-<meta property="og:title" content="Eternal Beloved">
-<meta property="og:description" content="Coração atravessado por flecha, em 3D. Para girar, aproximar e imprimir.">
-<meta name="theme-color" content="#0b0a0a">
 <title>Eternal Beloved</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -89,8 +81,7 @@
   }
   @media (max-width: 560px) and (max-height: 700px) { .label .d { display: none; } }
 </style>
-</head>
-<body>
+
 <p class="hud loading" id="loading">carregando a peça…</p>
 <canvas id="c" tabindex="0" aria-label="Peça 3D: coração atravessado por uma flecha, sobre uma bancada de concreto. Arraste para girar, role ou faça pinça para aproximar."></canvas>
 
@@ -102,7 +93,7 @@
 
 <div class="hud label">
   <span class="t">Eternal Beloved</span>
-  <span class="d" id="label-d">Chaveiro. Coração atravessado por flecha, 2026.<br>Relicário: abre ao meio e guarda uma foto.<br>4 cores sem AMS: coração rosa, haste preta, ponta branca, penas azuis.</span>
+  <span class="d" id="label-d">Chaveiro. Coração atravessado por flecha, 2026.<br>Relicário: abre ao meio, fecha com ímãs e guarda uma foto.<br>4 cores sem AMS: coração rosa, haste preta, ponta branca, penas azuis.</span>
 </div>
 
 <div class="hud finish">
@@ -155,7 +146,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const rawName = (() => { try { return decodeURIComponent(location.hash.slice(1)).replace(/[-_+]+/g, ' ').trim(); } catch { return ''; } })();
 const NAME = rawName && rawName.length <= 32 ? rawName.replace(/(^|\s)\p{L}/gu, c => c.toUpperCase()) : '';
-if (NAME) document.getElementById('label-d').innerHTML = `Chaveiro. Coração atravessado por flecha, 2026.<br>Relicário: abre ao meio e guarda uma foto.<br>4 cores sem AMS: coração rosa, haste preta, ponta branca, penas azuis. Para ${NAME.replace(/[<>&]/g, '')}.`;
+if (NAME) document.getElementById('label-d').innerHTML = `Chaveiro. Coração atravessado por flecha, 2026.<br>Relicário: abre ao meio, fecha com ímãs e guarda uma foto.<br>4 cores sem AMS: coração rosa, haste preta, ponta branca, penas azuis. Para ${NAME.replace(/[<>&]/g, '')}.`;
 
 const canvas = document.getElementById('c');
 const MOBILE = Math.min(innerWidth, innerHeight) < 700 || /Mobi|Android|iPhone|iPad/.test(navigator.userAgent);
@@ -292,8 +283,9 @@ const OUTLINE = [], POCKET = [];
 for (let k = 0; k < 160; k++) { const t = k / 160 * Math.PI * 2, r = rAt(t); OUTLINE.push(new THREE.Vector2(r * Math.cos(t), r * Math.sin(t) - .06)); POCKET.push(new THREE.Vector2(r * Math.cos(t) * .58, (r * Math.sin(t) - .06) * .58 + .05)); }
 const pocketBox = new THREE.Box2().setFromPoints(POCKET), pocketC = pocketBox.getCenter(new THREE.Vector2()), pocketW = pocketBox.max.x - pocketBox.min.x;
 const PHOTO = POCKET.map(p => p.clone().sub(pocketC).multiplyScalar((pocketW - .6 * U) / pocketW).add(pocketC));
-const PINS = [[13.6, 10.5], [-13.6, 10.5], [0, -12]].map(([x, y]) => new THREE.Vector2(x * U, y * U));
-const PIN_R = .975 * U, PIN_D = 3 * U, POCKET_D = .8 * U;
+// ímãs de neodímio 5 x 2 mm, encaixados rente ao corte (os mesmos furos do STL: Ø5,24 x 2,1 mm)
+const MAGS = [[12.2, 12.8], [-12.2, 12.8]].map(([x, y]) => new THREE.Vector2(x * U, y * U));
+const MAG_HOLE = 2.62 * U, MAG_R = 2.5 * U, MAG_T = 2 * U, POCKET_D = .8 * U;
 const circle = (c, r) => { const p = new THREE.Path(); p.absarc(c.x, c.y, r, 0, Math.PI * 2, true); return p; };
 
 /* foto: começa com um cartão, e dá para colocar a foto dela */
@@ -332,7 +324,7 @@ function syncHalfMats() {
   }
 }
 const holeMat = new THREE.MeshStandardMaterial({ color: '#2a0f1a', roughness: .9, side: THREE.BackSide });
-const pinMat = new THREE.MeshStandardMaterial({ color: '#f4f1ea', roughness: .4 });
+const magMat = new THREE.MeshPhysicalMaterial({ color: '#c9ccd3', metalness: 1, roughness: .22, clearcoat: .4 });
 function buildHalf(side, pivotAt = HINGE) {                          // side: 1 = frente (ponta da flecha), -1 = trás (penas e bolso)
   const pivot = new THREE.Group(); pivot.position.copy(pivotAt); piece.add(pivot);
   const body = new THREE.Group(); body.position.copy(pivotAt).multiplyScalar(-1); pivot.add(body);
@@ -345,17 +337,18 @@ function buildHalf(side, pivotAt = HINGE) {                          // side: 1 
   const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(plateShape, { depth: 1.6 * U, bevelEnabled: false, curveSegments: 48 }), mats.cap);
   plate.position.set(0, HINGE.y, side > 0 ? 0 : -1.6 * U); plate.castShadow = true; body.add(plate);
   const capShape = new THREE.Shape(OUTLINE);
-  PINS.forEach(p => capShape.holes.push(circle(p, PIN_R)));
+  MAGS.forEach(p => capShape.holes.push(circle(p, MAG_HOLE)));
   if (side < 0) capShape.holes.push(new THREE.Path(POCKET.slice().reverse()));
   const cap = new THREE.Mesh(new THREE.ShapeGeometry(capShape, 48), mats.cap); cap.position.z = side * .0004; cap.receiveShadow = true; body.add(cap);
-  PINS.forEach(p => { const w = new THREE.Mesh(new THREE.CylinderGeometry(PIN_R, PIN_R, PIN_D, 24), holeMat); w.rotation.x = Math.PI / 2; w.position.set(p.x, p.y, side * PIN_D / 2); body.add(w); });
+  MAGS.forEach(p => {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(MAG_HOLE, MAG_HOLE, 2.1 * U, 32, 1, true), holeMat); w.rotation.x = Math.PI / 2; w.position.set(p.x, p.y, side * 1.05 * U); body.add(w);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(MAG_R, MAG_R, MAG_T, 32), magMat); m.rotation.x = Math.PI / 2; m.position.set(p.x, p.y, side * (MAG_T / 2 + .02 * U)); body.add(m);
+  });
   if (side < 0) {
     const well = new THREE.Mesh(new THREE.ExtrudeGeometry(new THREE.Shape(POCKET), { depth: POCKET_D, bevelEnabled: false }), mats.well); well.position.z = -POCKET_D; body.add(well);
     const pg = new THREE.ShapeGeometry(new THREE.Shape(PHOTO), 48), uv = pg.attributes.uv, pp = pg.attributes.position, bb = new THREE.Box2().setFromPoints(PHOTO);
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (pp.getX(i) - bb.min.x) / (bb.max.x - bb.min.x), (pp.getY(i) - bb.min.y) / (bb.max.y - bb.min.y));
     const photo = new THREE.Mesh(pg, photoMat); photo.position.z = -POCKET_D + .25 * U; body.add(photo);
-  } else {
-    PINS.forEach(p => { const pin = new THREE.Mesh(new THREE.CylinderGeometry(.875 * U, .875 * U, 5.5 * U, 20), pinMat); pin.rotation.x = Math.PI / 2; pin.position.set(p.x, p.y, 0); pin.castShadow = true; body.add(pin); });
   }
   const half = { side, pivot, body, local, world, mats }; halves.push(half); return half;
 }
@@ -481,9 +474,9 @@ function frame() {
   elev += (elevT - elev) * (1 - Math.exp(-dt * 6)); dist += (distT - dist) * (1 - Math.exp(-dt * 6));
   piece.rotation.y = yaw;
   open += (openT - open) * (1 - Math.exp(-dt * 3.2)); const e = open * open * (3 - 2 * open);
-  // como na peça real: a argola passa pelos furos; a frente desliza pela argola até sair dos pinos e gira de lado em volta dela
+  // como na peça real: a argola passa pelos furos; a frente desliza pela argola soltando dos ímãs e gira de lado em volta dela
   const k1 = Math.min(1, e / .35), k2 = Math.max(0, (e - .3) / .7);
-  // 1) sai dos pinos deslizando 3,5 mm  2) sobe seguindo o arame da argola (conferido no Blender até 110°, sem colisão)
+  // 1) solta dos ímãs afastando 3,5 mm  2) sobe seguindo o arame da argola (conferido no Blender até 110°, sem colisão)
   FRONT.pivot.position.z = 3.5 * U * k1 * k1 * (3 - 2 * k1); FRONT.pivot.rotation.x = -1.75 * k2 * k2 * (3 - 2 * k2);
   piece.position.y = PIECE_Y + Math.sin(t * .8) * .06; // flutua
   camera.position.set(0, TARGET.y + Math.sin(elev) * dist, Math.cos(elev) * dist); camera.lookAt(TARGET);
@@ -495,5 +488,3 @@ function frame() {
 }
 requestAnimationFrame(frame);
 </script>
-</body>
-</html>
