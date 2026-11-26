@@ -41,14 +41,17 @@ COMMON = {
     "curr_bed_type": "Textured PEI Plate",   # a placa que vem com a P1S
 }
 PLATES = [
+    # peças pequenas saem em dobro: uma de reserva (e a ponta esfria melhor entre uma camada e outra)
     # nome, cor, arquivos, ajustes
     ("1-ROSA-coracao", "rosa", ["1-rosa-coracao-frente.stl", "1-rosa-coracao-tras.stl"],
-     {"enable_support": "1", "support_type": "tree(auto)", "support_on_build_plate_only": "1", "support_threshold_angle": "40"}),
-    ("2-PRETO-hastes", "preto", ["2-preto-haste-frente.stl", "2-preto-haste-tras.stl"],
+     # sem suporte: o domo cresce para dentro e os bolsos (foto e ímãs) ficam virados para a mesa, onde
+     # o suporte ficaria preso lá dentro; o teto deles é feito em ponte
+     {"enable_support": "0", "brim_type": "no_brim"}),
+    ("2-PRETO-hastes", "preto", ["2-preto-haste-frente.stl", "2-preto-haste-tras.stl"] * 2,
      {"enable_support": "0", "brim_type": "outer_only", "brim_width": "3"}),
-    ("3-BRANCO-ponta", "branco", ["3-branco-ponta.stl"],
+    ("3-BRANCO-ponta", "branco", ["3-branco-ponta.stl"] * 2,
      {"enable_support": "0", "brim_type": "outer_only", "brim_width": "3"}),
-    ("4-AZUL-penas", "azul", ["4-azul-penas.stl"],
+    ("4-AZUL-penas", "azul", ["4-azul-penas.stl"] * 2,
      {"enable_support": "0", "brim_type": "outer_only", "brim_width": "3"}),
 ]
 
