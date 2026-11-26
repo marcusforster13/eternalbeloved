@@ -37,6 +37,7 @@ COMMON = {
     "elefant_foot_compensation": "0.15",      # (grafia do próprio Bambu Studio)
     "elephant_foot_compensation": "0.15",
     "seam_position": "back",
+    "curr_bed_type": "Textured PEI Plate",   # a placa que vem com a P1S
 }
 PLATES = [
     # nome, cor, arquivos, ajustes
