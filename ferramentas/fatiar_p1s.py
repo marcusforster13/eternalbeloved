@@ -17,18 +17,27 @@ def load(kind, name):
     with open(os.path.join(BBL, kind, name + ".json"), encoding="utf-8") as f: return json.load(f)
 
 def flatten(kind, name):
-    """resolve a cadeia de 'inherits' dos perfis de sistema"""
+    """resolve a cadeia de 'inherits' dos perfis de sistema e os 'include' (é neles que ficam o
+    G-code oficial de início/fim/troca de camada da P1S: nivelamento, aquecimento, linha de purga)"""
     d = load(kind, name); chain = [d]
     while d.get("inherits"):
         d = load(kind, d["inherits"]); chain.append(d)
     out = {}
-    for d in reversed(chain): out.update(d)
-    out.pop("inherits", None); out["from"] = "system"; out["name"] = name
+    for d in reversed(chain):
+        for inc in d.get("include", []):
+            out.update({k: v for k, v in load(kind, inc).items() if k not in ("name", "instantiation", "from", "type")})
+        out.update(d)
+    for k in ("inherits", "include"): out.pop(k, None)
+    out["from"] = "system"; out["name"] = name
     return out
 
 machine = flatten("machine", "Bambu Lab P1S 0.4 nozzle")
 filament = flatten("filament", "Generic PLA High Speed @BBL P1P")   # PLA de alta velocidade (o perfil da P1P serve na P1S)
 filament["compatible_printers"] = ["Bambu Lab P1S 0.4 nozzle"]
+# caixa do filamento: bico 195-220 °C, mesa 50-65 °C. No perfil lento de qualidade máxima o fluxo é baixo,
+# então 210 °C dá detalhe mais nítido e menos fiapo; a primeira camada fica em 220 °C para grudar bem.
+filament["nozzle_temperature"] = ["210"]
+filament["nozzle_temperature_initial_layer"] = ["220"]
 base_process = flatten("process", "0.08mm High Quality @BBL P1P")   # qualidade máxima: camada 0,08, parede externa a 60 mm/s
 base_process["compatible_printers"] = ["Bambu Lab P1S 0.4 nozzle"]
 
@@ -89,6 +98,15 @@ for name, color, files, tweaks in PLATES:
            "--export-3mf", out3mf] + [os.path.join(PECAS, f) for f in files]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
     ok = os.path.exists(out3mf)
+    if ok:  # o CLI deixa o código do modelo vazio; o Bambu Studio grava "C12" para a P1S. Igual ao fatiado na tela.
+        tmp = out3mf + ".tmp"
+        with zipfile.ZipFile(out3mf) as zi, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zo:
+            for it in zi.infolist():
+                data = zi.read(it.filename)
+                if it.filename == "Metadata/slice_info.config":
+                    data = data.replace(b'key="printer_model_id" value=""', b'key="printer_model_id" value="C12"')
+                zo.writestr(it, data)
+        os.replace(tmp, out3mf)
     results[name] = {"ok": ok, "codigo": r.returncode, **(summary(out3mf) if ok else {}),
                      "erro": "" if ok else (r.stdout[-1500:] + r.stderr[-1500:])}
 print(json.dumps(results, indent=1, ensure_ascii=False))
