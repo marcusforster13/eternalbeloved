@@ -27,7 +27,8 @@ def flatten(kind, name):
     return out
 
 machine = flatten("machine", "Bambu Lab P1S 0.4 nozzle")
-filament = flatten("filament", "Bambu PLA Basic @BBL P1S 0.4 nozzle")
+filament = flatten("filament", "Generic PLA High Speed @BBL P1P")   # PLA de alta velocidade (o perfil da P1P serve na P1S)
+filament["compatible_printers"] = ["Bambu Lab P1S 0.4 nozzle"]
 base_process = flatten("process", "0.12mm Fine @BBL P1P")
 base_process["compatible_printers"] = ["Bambu Lab P1S 0.4 nozzle"]
 
